@@ -15,6 +15,11 @@ struct renderPassWithFramebuffer {
         framebuffer framebuffer;
     };
 
+struct cmdpools {
+	commandPool graphics_command_pool;
+	commandPool compute_command_pool;
+};
+
 depthStencilAttachment predepthAttachment;
 
 struct Buffers {
@@ -281,4 +286,23 @@ const auto& CreateTextureSampler() {
 	graphicsBase::Base().AddCallback_DestroySwapchain(Destroy);
 	Create();
 	return Sampler1;
+}
+
+const auto& CreateCommandPool() {
+	static cmdpools CmdPools;
+
+
+	auto Create = [] {
+		CmdPools.graphics_command_pool.Create(graphicsBase::Base().QueueFamilyIndex_Graphics(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+		CmdPools.compute_command_pool.Create(graphicsBase::Base().QueueFamilyIndex_Compute(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+		};
+	auto Destroy = [] {
+		
+		CmdPools.graphics_command_pool.~commandPool();
+		CmdPools.compute_command_pool.~commandPool();
+		};
+	graphicsBase::Base().AddCallback_CreateSwapchain(Create);
+	graphicsBase::Base().AddCallback_DestroySwapchain(Destroy);
+	Create();
+	return CmdPools;
 }

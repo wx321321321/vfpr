@@ -7,7 +7,7 @@
 #include "GlfwGeneral.hpp"
 #include "EasyVulkan.hpp"
 
-
+VModel model;
 
 inline std::string findFolderName(const std::string& str)
 {

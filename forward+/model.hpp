@@ -76,19 +76,19 @@ struct Vertex
 	*/
 	struct VBufferSection
 	{
-		VkBuffer handle = VK_NULL_HANDLE;
+		VkBuffer buffer = {};  // just a handle, no ownership for this buffer
 		VkDeviceSize offset = 0;
 		VkDeviceSize size = 0;
 
 		VBufferSection() = default;
 
-		VBufferSection(vulkan::deviceLocalBuffer& buf, VkDeviceSize offset, VkDeviceSize size)
-			: handle(buf),
-			offset(offset),
-			size(size) {
+		VBufferSection(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize size)
+			: buffer(buffer)
+			, offset(offset)
+			, size(size)
+		{
 		}
 	};
-
 	struct VMeshPart
 	{
 		// todo: separate mesh part with material?

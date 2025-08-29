@@ -937,7 +937,9 @@ namespace vulkan {
                 outStream << std::format("[ graphicsBase ] ERROR\nFailed to submit the command buffer!\nError code: {}\n", int32_t(result));
             return result;
         }
-       
+
+
+
         //该函数用于将命令缓冲区提交到用于计算的队列，且只使用栅栏的常见情形
         result_t SubmitCommandBuffer_Compute(VkCommandBuffer commandBuffer, VkFence fence = VK_NULL_HANDLE) const {
             VkSubmitInfo submitInfo = {
@@ -1156,8 +1158,34 @@ namespace vulkan {
                 outStream << std::format("[ commandBuffer ] ERROR\nFailed to end a command buffer!\nError code: {}\n", int32_t(result));
             return result;
         }
-    };
+        void pipelineBarrier(
+            VkPipelineStageFlags srcStageMask,
+            VkPipelineStageFlags dstStageMask,
+            VkDependencyFlags dependencyFlags = 0,
+            uint32_t memoryBarrierCount = 0,
+            const VkMemoryBarrier* pMemoryBarriers = nullptr,
+            uint32_t bufferMemoryBarrierCount = 0,
+            const VkBufferMemoryBarrier* pBufferMemoryBarriers = nullptr,
+            uint32_t imageMemoryBarrierCount = 0,
+            const VkImageMemoryBarrier* pImageMemoryBarriers = nullptr
+        ) const {
+            // 确保命令缓冲区有效
 
+            vkCmdPipelineBarrier(
+                handle,
+                srcStageMask,
+                dstStageMask,
+                dependencyFlags,
+                memoryBarrierCount,
+                pMemoryBarriers,
+                bufferMemoryBarrierCount,
+                pBufferMemoryBarriers,
+                imageMemoryBarrierCount,
+                pImageMemoryBarriers
+            );
+
+        };
+    };
     class commandPool {
         VkCommandPool handle = VK_NULL_HANDLE;
     public:
