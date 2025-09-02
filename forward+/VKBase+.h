@@ -549,11 +549,33 @@ namespace vulkan {
             imageMemory.Create(
                 imageCreateInfo,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | bool(otherUsages & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT) * VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT);
-            VkImageAspectFlags aspectMask = (!stencilOnly) * VK_IMAGE_ASPECT_DEPTH_BIT;
-            if (format > VK_FORMAT_S8_UINT)
-                aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
-            else if (format == VK_FORMAT_S8_UINT)
-                aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+			VkImageAspectFlags aspectMask = 0;
+			bool hasDepth = (format == VK_FORMAT_D16_UNORM) ||
+				(format == VK_FORMAT_D32_SFLOAT) ||
+				(format == VK_FORMAT_D24_UNORM_S8_UINT) ||
+				(format == VK_FORMAT_D32_SFLOAT_S8_UINT);
+			bool hasStencil = (format == VK_FORMAT_S8_UINT) ||
+				(format == VK_FORMAT_D24_UNORM_S8_UINT) ||
+				(format == VK_FORMAT_D32_SFLOAT_S8_UINT);
+			if (stencilOnly) {
+				if (hasStencil) {
+					aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+				}
+				else {
+					assert(false && "stencilOnly=true but format has no stencil component");
+				}
+			}
+			else {
+				if (hasDepth) {
+					aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+				}
+				else if (hasStencil) {
+					aspectMask = VK_IMAGE_ASPECT_STENCIL_BIT;
+				}
+				else {		
+					assert(false && "format has no depth/stencil component");
+				}
+			}
             imageView.Create(
                 imageMemory.Image(),
                 layerCount > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D,

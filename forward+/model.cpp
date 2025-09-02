@@ -1,14 +1,9 @@
 // Copyright(c) 2016 Ruoyu Fan (Windy Darian), Xueyin Wan
 // MIT License.
-#include <vector>
-#include <string>
-#include <unordered_map>
 #include "model.hpp"
-#include "GlfwGeneral.hpp"
-#include "EasyVulkan.hpp"
+
 
 VModel model;
-
 inline std::string findFolderName(const std::string& str)
 {
 	return str.substr(0, str.find_last_of("/\\"));
@@ -134,7 +129,7 @@ VModel VModel::loadModelFromFile(const std::string& path, const vulkan::sampler&
 {
 	VModel model;
 
-	auto device = graphicsBase::Base().Device();
+	auto device =vulkan::graphicsBase::Base().Device();
 	//std::vector<util::Vertex> vertices, std::vector<util::Vertex::index_t> vertex_indices;
 	auto groups = loadModel(path);
 	VkDeviceSize vertex_buffer_size = 0;
@@ -175,16 +170,15 @@ VModel VModel::loadModelFromFile(const std::string& path, const vulkan::sampler&
 
 		if (!group.albedo_map_path.empty())
 		{
-			model.textures.emplace_back(group.albedo_map_path, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM);
+			model.textures.emplace_back(group.albedo_map_path.c_str(), VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM);
 			part.albedo_map.Create(group.albedo_map_path.c_str(), VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM);
 		}
 		if (!group.normal_map_path.empty())
 		{
-			model.textures.emplace_back(group.normal_map_path, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM);
+			model.textures.emplace_back(group.normal_map_path.c_str(), VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM);
 			part.normal_map.Create(group.normal_map_path.c_str(), VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM);
 		}
-
-		model.mesh_parts.push_back(part);
+		model.mesh_parts.push_back(std::move(part));
 	}
 
 	auto createMaterialDescriptorSet = [ &device, &texture_sampler, &descriptor_pool, &material_descriptor_set_layout](
@@ -250,7 +244,7 @@ VModel VModel::loadModelFromFile(const std::string& path, const vulkan::sampler&
 			uniform_buffer.TransferData(&ubo, offset, size);
 		};
 
-	const VkDeviceSize ubo_aligned_size = uniformBuffer::CalculateAlignedSize(sizeof(MaterialUbo));
+	const VkDeviceSize ubo_aligned_size = vulkan::uniformBuffer::CalculateAlignedSize(sizeof(MaterialUbo));
 	const VkDeviceSize total_uniform_size = ubo_aligned_size * model.mesh_parts.size(); 
 
 	model.uniform_buffer.Create(total_uniform_size);

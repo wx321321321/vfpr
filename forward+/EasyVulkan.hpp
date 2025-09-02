@@ -5,6 +5,7 @@
 using namespace vulkan;
 const VkExtent2D& windowSize = graphicsBase::Base().SwapchainCreateInfo().imageExtent;
 
+depthStencilAttachment  predepthAttachment;
 
 struct renderPassWithFramebuffers {
         renderPass renderPass;
@@ -20,7 +21,6 @@ struct cmdpools {
 	commandPool compute_command_pool;
 };
 
-depthStencilAttachment predepthAttachment;
 
 struct Buffers {
 	uniformBuffer object_uniform_buffer;
@@ -35,7 +35,8 @@ struct Buffers {
 	VkDeviceSize light_visibility_buffer_size;
 };
 
-const auto& CreateRpwf_preDepth(VkFormat depthStencilFormat = VK_FORMAT_D24_UNORM_S8_UINT) {
+
+const auto& CreateRpwf_preDepth(VkFormat depthStencilFormat = VK_FORMAT_D32_SFLOAT) {
 	static renderPassWithFramebuffer rpwf;
 	static VkFormat _depthStencilFormat = depthStencilFormat;//因为一会儿需要用lambda定义重建交换链时的回调函数，把格式存到静态变量
 
@@ -78,7 +79,6 @@ const auto& CreateRpwf_preDepth(VkFormat depthStencilFormat = VK_FORMAT_D24_UNOR
 	rpwf.renderPass.Create(renderPassCreateInfo);
 
 	auto CreateFramebuffers = [] {
-		predepthAttachment.Create(_depthStencilFormat, windowSize, 1, VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT);
 		VkFramebufferCreateInfo framebufferCreateInfo = {
 			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
 			.renderPass = rpwf.renderPass,
@@ -88,7 +88,7 @@ const auto& CreateRpwf_preDepth(VkFormat depthStencilFormat = VK_FORMAT_D24_UNOR
 			.layers = 1,
 		};
 
-		VkImageView attachments[1] = {predepthAttachment.ImageView() };
+		VkImageView attachments[1] = { predepthAttachment.ImageView() };
 		framebufferCreateInfo.pAttachments = attachments;
 			rpwf.framebuffer.Create(framebufferCreateInfo);
 		
@@ -101,7 +101,7 @@ const auto& CreateRpwf_preDepth(VkFormat depthStencilFormat = VK_FORMAT_D24_UNOR
 	return rpwf;
 }
 
-const auto& CreateRpwf_mainRender(VkFormat depthStencilFormat = VK_FORMAT_D24_UNORM_S8_UINT) {
+const auto& CreateRpwf_mainRender(VkFormat depthStencilFormat = VK_FORMAT_D32_SFLOAT) {
 	static renderPassWithFramebuffers rpwf;
 	
 		VkAttachmentDescription color_attachment = {};
@@ -158,6 +158,7 @@ const auto& CreateRpwf_mainRender(VkFormat depthStencilFormat = VK_FORMAT_D24_UN
 		render_pass_info.dependencyCount = 1;
 		render_pass_info.pDependencies = &dependency;
 
+		rpwf.renderPass.Create(render_pass_info);
 	auto CreateFramebuffers = [] {
 		rpwf.framebuffers.resize(graphicsBase::Base().SwapchainImageCount());
 		VkFramebufferCreateInfo framebufferCreateInfo = {
@@ -178,7 +179,7 @@ const auto& CreateRpwf_mainRender(VkFormat depthStencilFormat = VK_FORMAT_D24_UN
 		};
 	graphicsBase::Base().AddCallback_CreateSwapchain(CreateFramebuffers);
 	graphicsBase::Base().AddCallback_DestroySwapchain(DestroyFramebuffers);
-
+	CreateFramebuffers();
 	return rpwf;
 }
 
@@ -229,9 +230,9 @@ const auto& CreateBuffers() {
 		buffers.pointlight_buffer_size = sizeof(PointLight) * MAX_POINT_LIGHT_COUNT + sizeof(glm::vec4);
 		buffers.pointlight_uniform_buffer.Create(buffers.pointlight_buffer_size);
 
-		tile_count_per_row = (windowSize.width - 1) / TILE_SIZE + 1;
-		tile_count_per_col = (windowSize.height - 1) / TILE_SIZE + 1;
-		buffers.light_visibility_buffer_size = sizeof(_Dummy_VisibleLightsForTile) * tile_count_per_row * tile_count_per_col;
+		graphicsBase::Base().tile_count_per_row = (windowSize.width - 1) / TILE_SIZE + 1;
+		graphicsBase::Base().tile_count_per_col = (windowSize.height - 1) / TILE_SIZE + 1;
+		buffers.light_visibility_buffer_size = sizeof(_Dummy_VisibleLightsForTile) * graphicsBase::Base().tile_count_per_row * graphicsBase::Base().tile_count_per_col;
 		buffers.light_visibility_uniform_buffer.Create(buffers.light_visibility_buffer_size);
 
 

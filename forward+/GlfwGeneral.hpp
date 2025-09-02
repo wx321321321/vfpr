@@ -10,6 +10,133 @@ GLFWwindow* pWindow;
 GLFWmonitor* pMonitor;
 const char* windowTitle = "EasyVk";
 
+
+
+struct cameraAdjustSign {
+	bool lmb_down = false;
+	bool rmb_down = false;
+	glm::vec2 cursor_pos = { 0.0f, 0.0f };
+	glm::vec2 prev_cursor_pos = { 0.0f, 0.0f };
+	bool w_down = false; // todo use a hash map or something
+	bool s_down = false;
+	bool a_down = false;
+	bool d_down = false;
+	bool q_down = false;
+	bool e_down = false;
+	bool z_pressed = false;
+
+	void onMouseButton(int button, int action, int mods)
+	{
+		if (action == GLFW_PRESS) {
+			double x, y;
+			glfwGetCursorPos(pWindow, &x, &y);
+			cursor_pos = { x, y };
+			prev_cursor_pos = { x, y };
+
+			if (button == GLFW_MOUSE_BUTTON_LEFT)
+			{
+				lmb_down = true;
+			}
+			else if (button == GLFW_MOUSE_BUTTON_RIGHT)
+			{
+				rmb_down = true;
+				glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			}
+		}
+		else if (action == GLFW_RELEASE)
+		{
+			if (button == GLFW_MOUSE_BUTTON_LEFT)
+			{
+				lmb_down = false;
+			}
+			else if (button == GLFW_MOUSE_BUTTON_RIGHT)
+			{
+				rmb_down = false;
+				glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+			}
+		}
+	}
+
+	void onKeyPress(int key, int scancode, int action, int mods)
+	{
+		if (action == GLFW_PRESS)
+		{
+			switch (key)
+			{
+				// todo use a hash map or something
+			case GLFW_KEY_W:
+				w_down = true;
+				break;
+			case GLFW_KEY_S:
+				s_down = true;
+				break;
+			case GLFW_KEY_A:
+				a_down = true;
+				break;
+			case GLFW_KEY_D:
+				d_down = true;
+				break;
+			case GLFW_KEY_Q:
+				q_down = true;
+				break;
+			case GLFW_KEY_E:
+				e_down = true;
+				break;
+			}
+		}
+		else if (action == GLFW_RELEASE)
+		{
+			switch (key)
+			{
+			case GLFW_KEY_W:
+				w_down = false;
+				break;
+			case GLFW_KEY_S:
+				s_down = false;
+				break;
+			case GLFW_KEY_A:
+				a_down = false;
+				break;
+			case GLFW_KEY_D:
+				d_down = false;
+				break;
+			case GLFW_KEY_Q:
+				q_down = false;
+				break;
+			case GLFW_KEY_E:
+				e_down = false;
+				break;
+			case GLFW_KEY_Z:
+				z_pressed = true;
+			}
+		}
+	}
+
+	void onCursorPosChanged(double xPos, double yPos)
+	{
+		//std::cout << xPos << "," << yPos << std::endl;
+		if (!lmb_down && !rmb_down) {
+			return;
+		}
+		else if (lmb_down) {
+			//glm::vec2 tmp(xPos, yPos);
+			//modelRotAngles += (tmp - cursorPos) * 0.01f;
+
+			cursor_pos = { xPos, yPos };
+		}
+		else if (rmb_down) {
+			glm::vec2 tmp(xPos, yPos);
+
+			cursor_pos = { xPos, yPos };
+		}
+
+	}
+
+
+};
+
+cameraAdjustSign AdjustSign;
+
 bool InitializeWindow(VkExtent2D size, bool fullScreen = false, bool isResizable = true, bool limitFrameRate = true) {
 	
     //glfw初始化
@@ -31,7 +158,23 @@ bool InitializeWindow(VkExtent2D size, bool fullScreen = false, bool isResizable
 		glfwTerminate();
 		return false;
 	}
+	auto cursorpos_callback = [](GLFWwindow* window, double xPos, double yPos)
+		{
+			AdjustSign.onCursorPosChanged(xPos, yPos);
+		};
 
+	auto mousebutton_callback = [](GLFWwindow* window, int button, int action, int mods)
+		{
+			AdjustSign.onMouseButton(button, action, mods);
+		};
+
+	auto key_callback = [](GLFWwindow* window, int key, int scancode, int action, int mods)
+		{
+			AdjustSign.onKeyPress(key, scancode, action, mods);
+		};
+	glfwSetKeyCallback(pWindow, key_callback);
+	glfwSetCursorPosCallback(pWindow, cursorpos_callback);
+	glfwSetMouseButtonCallback(pWindow, mousebutton_callback);
 
     //层和扩展初始化
 #ifdef _WIN32
@@ -70,7 +213,7 @@ bool InitializeWindow(VkExtent2D size, bool fullScreen = false, bool isResizable
     
     if (//短路，有一个操作直接返回false
         vulkan::graphicsBase::Base().GetPhysicalDevices() ||  
-        vulkan::graphicsBase::Base().DeterminePhysicalDevice(0, true, false) ||     
+        vulkan::graphicsBase::Base().DeterminePhysicalDevice(0, true, true) ||     
         vulkan::graphicsBase::Base().CreateDevice()){ 
         return false;
     }
@@ -80,6 +223,7 @@ bool InitializeWindow(VkExtent2D size, bool fullScreen = false, bool isResizable
         return false;
     return true;
 }
+
 void TerminateWindow() {
     vulkan::graphicsBase::Base().WaitIdle();
 	glfwTerminate();

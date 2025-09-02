@@ -25,6 +25,7 @@ namespace vulkan {
 
     class graphicsBase {
 
+
         //实例相关
         uint32_t apiVersion = VK_API_VERSION_1_0;
         VkInstance instance;
@@ -64,7 +65,7 @@ namespace vulkan {
         graphicsBasePlus* pPlus = nullptr;
         static graphicsBase singleton;
         //构造移动析构函数
-        graphicsBase() = default;
+        graphicsBase() {}
         graphicsBase(const graphicsBase&) = delete;
         graphicsBase(graphicsBase&&) = delete;
         ~graphicsBase() {
@@ -174,14 +175,23 @@ namespace vulkan {
             swapchainCreateInfo = {};
             debugMessenger = VK_NULL_HANDLE;
         }
+        //管理一些变量：
+        int tile_count_per_row;
+        int tile_count_per_col;
 
+        glm::mat4 view_matrix;
+        glm::vec3 cam_pos;
+        int debug_view_index = 0;
 
 
 
         //Getter
         //  static graphicsBasePlus& Plus() { return *singleton.pPlus; }
-   
+        
         static graphicsBasePlus& Plus() { return *singleton.pPlus; }
+        int get_debugindex() {
+            return debug_view_index;
+        }
         //*pPlus的Setter，只允许设置pPlus一次
         static void Plus(graphicsBasePlus& plus) { if (!singleton.pPlus) singleton.pPlus = &plus; }
         //实例相关信息存储接口
@@ -276,6 +286,13 @@ namespace vulkan {
         //GetterEND
 
         //function
+        // 
+        // 
+        // 
+        void changeDebugViewIndex() {
+            debug_view_index++;
+            debug_view_index = debug_view_index % 5;
+        }
         //Const函数 检查层和扩展
  
         VkResult CheckInstanceLayers(std::span<const char*> layersToCheck) const {
@@ -1107,6 +1124,9 @@ namespace vulkan {
         //Non-const Function
         result_t Create(VkSemaphoreCreateInfo& createInfo) {
             createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+            if (vulkan::graphicsBase::Base().Device() == VK_NULL_HANDLE) {
+                std::cout << 1 << std::endl;
+            }
             VkResult result = vkCreateSemaphore(vulkan::graphicsBase::Base().Device(), &createInfo, nullptr, &handle);
             if (result)
                 outStream << std::format("[ semaphore ] ERROR\nFailed to create a semaphore!\nError code: {}\n", int32_t(result));
@@ -1933,6 +1953,11 @@ namespace vulkan {
                 .descriptorSetCount = uint32_t(sets.Count()),
                 .pSetLayouts = setLayouts.Pointer()
             };
+
+            if (graphicsBase::Base().Device() == VK_NULL_HANDLE) {
+                std::cout << 1;
+            }
+            
             VkResult result = vkAllocateDescriptorSets(graphicsBase::Base().Device(), &allocateInfo, sets.Pointer());
             if (result)
                 outStream << std::format("[ descriptorPool ] ERROR\nFailed to allocate descriptor sets!\nError code: {}\n", int32_t(result));

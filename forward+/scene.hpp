@@ -2,14 +2,11 @@
 // MIT License.
 
 #pragma once
-
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm.hpp>
 #include <gtc/quaternion.hpp>
 #include <gtx/quaternion.hpp>
-
-
-#include <vector>
-#include <string>
+#include "EasyVKStart.h"
 
 struct Camera
 {
@@ -28,6 +25,9 @@ public:
 		// return glm::inverse(glm::translate(glm::toMat4(rotation), position));
 		return glm::transpose(glm::toMat4(rotation)) * glm::translate(glm::mat4(1.0f), -position); // equal to inv(TR) 
 	}
+	glm::vec3 getpos()const {
+		return position;
+	}
 };
 
 // for test use
@@ -42,7 +42,20 @@ struct TestSceneConfiguration
 	glm::vec3 camera_position;
 	glm::quat camera_rotation;
 };
+struct PointLight
+{
+public:
+	glm::vec3 pos;
+	float radius = { 5.0f };
+	glm::vec3 intensity = { 1.0f, 1.0f, 1.0f };
+	float padding;
+	PointLight() {}
+	PointLight(glm::vec3 pos, float radius, glm::vec3 intensity)
+		: pos(pos), radius(radius), intensity(intensity)
+	{
+	};
+};
 
-std::vector<PointLight> pointlights;
+extern std::vector<PointLight> pointlights;
 
 TestSceneConfiguration& getGlobalTestSceneConfiguration();

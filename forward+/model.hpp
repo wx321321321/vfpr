@@ -1,7 +1,8 @@
 #pragma once
 #include "VKBase+.h"
+#include "VKBase.h"
 #include <functional> 
-
+#include "EasyVKStart.h"
 template <class T>
 void hash_combine(std::size_t& seed, const T& v)
 {
@@ -132,8 +133,7 @@ struct Vertex
 			, const vulkan::sampler& texture_sampler, const vulkan::descriptorPool& descriptor_pool,
 			const vulkan::descriptorSetLayout& material_descriptor_set_layout);
 
-		VModel(const VModel&) = delete;
-		VModel& operator= (const VModel&) = delete;
+	
 
 	private:
 		vulkan::vertexBuffer vertex_buffer;

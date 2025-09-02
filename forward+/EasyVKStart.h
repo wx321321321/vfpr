@@ -16,6 +16,7 @@
 #include <numeric>
 #include <numbers>
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include<glm.hpp>
 #include<gtc/matrix_transform.hpp>
 #include <gtc/random.hpp>（
@@ -26,18 +27,17 @@
 #pragma comment (lib,"vulkan-1.lib")
 #endif
 #include <vulkan/vulkan.h>
-#include"util.h"
+
 #include"tiny_obj_loader.h"
 
 
 
 
-
-
-
-
-
-
+constexpr float MIN_DELTA_TIME = 1.0f / 60.0f;
+constexpr float SMALL_NUMBER = 1e-8f;
+constexpr glm::vec3 vec_up = glm::vec3(0.0f, 1.0f, 0.0f);
+constexpr glm::vec3 vec_right = glm::vec3(1.0f, 0.0f, 0.0f);
+constexpr glm::vec3 vec_forward = glm::vec3(0.0f, 0.0f, -1.0f);
 
 const int MAX_POINT_LIGHT_COUNT = 20000; //TODO: change it back smaller
 //const int MAX_POINT_LIGHT_PER_TILE = 63;
@@ -45,26 +45,6 @@ const int MAX_POINT_LIGHT_PER_TILE = 1023;
 // const int TILE_SIZE = 16;
 const int TILE_SIZE = 16;
 
-int tile_count_per_row;
-int tile_count_per_col;
-
-glm::mat4 view_matrix;
-glm::vec3 cam_pos; 
-int debug_view_index = 0;
-//点光源
-struct PointLight
-{
-public:
-    glm::vec3 pos;
-    float radius = { 5.0f };
-    glm::vec3 intensity = { 1.0f, 1.0f, 1.0f };
-    float padding;
-    PointLight() {}
-    PointLight(glm::vec3 pos, float radius, glm::vec3 intensity)
-        : pos(pos), radius(radius), intensity(intensity)
-    {
-    };
-};
 //场景
 struct SceneObjectUbo
 {
