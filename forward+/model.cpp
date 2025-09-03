@@ -180,8 +180,8 @@ VModel VModel::loadModelFromFile(const std::string& path, const vulkan::sampler&
 		}
 		model.mesh_parts.push_back(std::move(part));
 	}
-
-	auto createMaterialDescriptorSet = [ &device, &texture_sampler, &descriptor_pool, &material_descriptor_set_layout](
+	MaterialUbo ubo{ 0, 0 };
+	auto createMaterialDescriptorSet = [&ubo, &device, &texture_sampler, &descriptor_pool, &material_descriptor_set_layout](
 		VMeshPart& mesh_part
 		, vulkan::uniformBuffer& uniform_buffer, VkDeviceSize offset, VkDeviceSize size
 		)
@@ -196,7 +196,7 @@ VModel VModel::loadModelFromFile(const std::string& path, const vulkan::sampler&
 			 
 			descriptor_pool.AllocateSets(mesh_part.material_descriptor_set, material_descriptor_set_layout);
 
-			MaterialUbo ubo{ 0, 0 };
+			ubo = { 0, 0 };
 
 			std::vector<VkWriteDescriptorSet> descriptor_writes = {};
 
@@ -241,7 +241,7 @@ VModel VModel::loadModelFromFile(const std::string& path, const vulkan::sampler&
 				);
 			}
 
-			uniform_buffer.TransferData(&ubo, offset, size);
+			uniform_buffer.TransferData(&ubo, sizeof(ubo), offset);
 		};
 
 	const VkDeviceSize ubo_aligned_size = vulkan::uniformBuffer::CalculateAlignedSize(sizeof(MaterialUbo));

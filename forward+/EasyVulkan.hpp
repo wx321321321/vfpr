@@ -27,10 +27,10 @@ struct Buffers {
 	//stagingBuffer object_staging_buffer;
 	uniformBuffer camera_uniform_buffer;
 	//stagingBuffer camera_staging_buffer;
-	uniformBuffer pointlight_uniform_buffer;
+	storageBuffer pointlight_uniform_buffer;
 	//stagingBuffer pointlight_staging_buffer;
 	VkDeviceSize pointlight_buffer_size;
-    uniformBuffer light_visibility_uniform_buffer;
+    storageBuffer light_visibility_storage_buffer;
 	//stagingBuffer light_visibility_staging_buffer;
 	VkDeviceSize light_visibility_buffer_size;
 };
@@ -47,7 +47,7 @@ const auto& CreateRpwf_preDepth(VkFormat depthStencilFormat = VK_FORMAT_D32_SFLO
 		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
 		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-		.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 		.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 	};
 	VkAttachmentReference depth_attachment_ref = {};
@@ -61,12 +61,16 @@ const auto& CreateRpwf_preDepth(VkFormat depthStencilFormat = VK_FORMAT_D32_SFLO
 
 	VkSubpassDependency dependency = {};
 	dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-	dependency.dstSubpass = 0; // 0  refers to the subpass
-	dependency.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-	dependency.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-	dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	
+	dependency.dstSubpass = 0;
+	// 源阶段：外部阶段（无需等待任何特定阶段）
+	dependency.srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+	dependency.srcAccessMask = 0;  // 无前置访问需求
+	// 目标阶段：深度测试阶段（深度附件在此阶段被访问）
+	dependency.dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+	// 目标访问：深度附件的读写操作
+	dependency.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+	// 允许布局转换
+	dependency.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
 	VkRenderPassCreateInfo renderPassCreateInfo = {
 			.attachmentCount = 1,
 			.pAttachments = &attachmentDescriptions,
@@ -233,16 +237,12 @@ const auto& CreateBuffers() {
 		graphicsBase::Base().tile_count_per_row = (windowSize.width - 1) / TILE_SIZE + 1;
 		graphicsBase::Base().tile_count_per_col = (windowSize.height - 1) / TILE_SIZE + 1;
 		buffers.light_visibility_buffer_size = sizeof(_Dummy_VisibleLightsForTile) * graphicsBase::Base().tile_count_per_row * graphicsBase::Base().tile_count_per_col;
-		buffers.light_visibility_uniform_buffer.Create(buffers.light_visibility_buffer_size);
-
-
+		buffers.light_visibility_storage_buffer.Create(buffers.light_visibility_buffer_size);
 		};
 
 	auto Destroy = [] {
 		buffers.object_uniform_buffer.~uniformBuffer();
 		buffers.camera_uniform_buffer.~uniformBuffer();
-		buffers.pointlight_uniform_buffer.~uniformBuffer();
-		buffers.light_visibility_uniform_buffer.~uniformBuffer();
 		};
 	graphicsBase::Base().AddCallback_CreateSwapchain(Create);
 	graphicsBase::Base().AddCallback_DestroySwapchain(Destroy);

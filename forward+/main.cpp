@@ -74,7 +74,7 @@ void CreateDescriptorSetLayout() {
 	camera_layout_binding.binding = 0;
 	camera_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	camera_layout_binding.descriptorCount = 1;
-	camera_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT ; // only referencing from vertex shader
+	camera_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT; // only referencing from vertex shader
 	camera_layout_binding.pImmutableSamplers = nullptr;
 	VkDescriptorSetLayoutCreateInfo layout_info2 = {};
 	layout_info2.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -92,7 +92,7 @@ void CreateDescriptorSetLayout() {
 	light_culling_layout_binding_result.pImmutableSamplers = nullptr;
 	VkDescriptorSetLayoutBinding light_culling_layout_binding_point_lights = {};
 	light_culling_layout_binding_point_lights.binding = 1;
-	light_culling_layout_binding_point_lights.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	light_culling_layout_binding_point_lights.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
 	light_culling_layout_binding_point_lights.descriptorCount = 1;
 	light_culling_layout_binding_point_lights.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT; // only referencing from vertex shader
 	light_culling_layout_binding_point_lights.pImmutableSamplers = nullptr;
@@ -178,9 +178,11 @@ void createLigutCullingDescriptorSet()
 	const auto& Descriptorpool = DescriptorPool();
 	DescriptorPool().AllocateSets(light_culling_descriptor_set, light_culling_descriptor_set_layout);
 	VkDescriptorBufferInfo bufferInfos[] = {
-		{ Buffers1().light_visibility_uniform_buffer, 0, Buffers1().light_visibility_buffer_size}
+		{ Buffers1().light_visibility_storage_buffer, 0, Buffers1().light_visibility_buffer_size},
+		{ Buffers1().pointlight_uniform_buffer, 0, Buffers1().pointlight_buffer_size}
 	};
 	light_culling_descriptor_set.Write(bufferInfos[0], VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 0, 0);
+	light_culling_descriptor_set.Write(bufferInfos[1], VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, 0);
 
 }
 
@@ -201,15 +203,6 @@ void updateIntermediateDescriptorSet() {
 	intermediate_descriptor_set.Write(depth_image_info, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 0, 0);
 }
 
-void binduniform2ComputeDescriptor() {
-
-	VkDescriptorBufferInfo bufferInfos[] = {
-		{ Buffers1().light_visibility_uniform_buffer, 0, Buffers().light_visibility_buffer_size},
-		{ Buffers1().pointlight_uniform_buffer, 0, Buffers().pointlight_buffer_size }
-	};
-	light_culling_descriptor_set.Write(bufferInfos[0], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 0);
-	light_culling_descriptor_set.Write(bufferInfos[1], VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 0, 1);
-}
 
 pipelineLayout pipelineLayout_depth;
 pipelineLayout pipelineLayout_mainrender;
@@ -416,7 +409,6 @@ void createDepthPrePassCommandBuffer() {
 
 	for (const auto& part : model.getMeshParts())
 	{
-
 		vkCmdBindPipeline(depth_prepass_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_depth);
 		std::vector<VkDescriptorSet> depth_descriptor_sets = { object_descriptor_set, camera_descriptor_set };
 		vkCmdBindDescriptorSets(depth_prepass_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout_depth, 0, 2, depth_descriptor_sets.data(), 0, nullptr);
@@ -446,7 +438,7 @@ void createlightcullincommand_bufferCommandBuffer() {
 		VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT,   // dstAccessMask：接下来的访问类型（计算着色器写入）
 		0, // srcQueueFamilyIndex：源队列族（0表示无跨队列族，或未指定）
 		0, // dstQueueFamilyIndex：目标队列族（0表示无跨队列族）
-		Buffers1().light_visibility_uniform_buffer,  // buffer：需要同步的缓冲区（光源可见性缓冲）
+		Buffers1().light_visibility_storage_buffer,  // buffer：需要同步的缓冲区（光源可见性缓冲）
 		0,  // offset：同步范围的起始偏移（0表示从开头）
 		Buffers1().light_visibility_buffer_size  // size：同步范围的大小（整个缓冲区）
 	);
@@ -485,7 +477,7 @@ void createlightcullincommand_bufferCommandBuffer() {
 		VK_ACCESS_SHADER_READ_BIT,   // dstAccessMask
 		0,                           // srcQueueFamilyIndex
 		0,                           // dstQueueFamilyIndex
-		Buffers1().light_visibility_uniform_buffer,  // buffer
+		Buffers1().light_visibility_storage_buffer,  // buffer
 		0,                           // offset
 		Buffers1().light_visibility_buffer_size      // size
 	);
@@ -576,7 +568,6 @@ void prepareAll() {
 	createLigutCullingDescriptorSet();
 	CreateIntermediateDescriptorSet();
 	updateIntermediateDescriptorSet();
-	binduniform2ComputeDescriptor();
 	CreateGraphicLayout();
 	CreateGraphicPipeline();
 	CreateComputePipeline();
@@ -648,15 +639,23 @@ void tick(float delta_time)
 	}
 }
 
+struct semfence {
+		fence fence ; 
+		semaphore render_finished_semaphore;
+		semaphore lightculling_completed_semaphore;
+		semaphore depth_prepass_finished_semaphore;
+	};
+
+
 int main() {
 
 	
 	if (!InitializeWindow({ 1280, 720 }))
 		return -1;
-	semaphore render_finished_semaphore;
-	semaphore image_available_semaphore;
-	semaphore lightculling_completed_semaphore;
-	semaphore depth_prepass_finished_semaphore;
+	
+	
+	std::vector<semfence>semfences(graphicsBase::Base().SwapchainImageCount());
+
 	predepthAttachment.Create(
 		VK_FORMAT_D32_SFLOAT,             
 		windowSize,                           
@@ -670,11 +669,13 @@ int main() {
 	auto previous = std::chrono::high_resolution_clock::now();
 	decltype(previous) current;
 	float delta_time;
+	uint32_t frameObjectIndex = 0;
 	
-
 	while (!glfwWindowShouldClose(pWindow)) {
 		while (glfwGetWindowAttrib(pWindow, GLFW_ICONIFIED))
+		{
 			glfwWaitEvents();
+		}
 		current = std::chrono::high_resolution_clock::now();
 		delta_time = std::chrono::duration<float>(current - previous).count();
 		glfwPollEvents();
@@ -692,7 +693,11 @@ int main() {
 		}
 
 		Updateuniform(delta_time);
+		semaphore semaphore_imageIsAvailable;
+		frameObjectIndex = (frameObjectIndex + 1) % graphicsBase::Base().SwapchainImageCount();
+		graphicsBase::Base().SwapImage(semaphore_imageIsAvailable);
 		uint32_t imageIndex = graphicsBase::Base().CurrentImageIndex();
+		const auto& [fence, render_finished_semaphore, lightculling_completed_semaphore, depth_prepass_finished_semaphore] = semfences[imageIndex];
 		//深度：
 		graphicsBase::Base().SubmitCommandBuffer_Graphics(depth_prepass_command_buffer, VK_NULL_HANDLE, depth_prepass_finished_semaphore);
 		//光剔除
@@ -710,7 +715,7 @@ int main() {
 		//main
 		VkSubmitInfo submit_info1 = {};
 		submit_info1.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		VkSemaphore wait_semaphores[] = { image_available_semaphore , lightculling_completed_semaphore }; // which semaphore to wait
+		VkSemaphore wait_semaphores[] = { semaphore_imageIsAvailable , lightculling_completed_semaphore }; // which semaphore to wait
 		VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT }; // which stage to execute
 		submit_info1.waitSemaphoreCount = 2;
 		submit_info1.pWaitSemaphores = wait_semaphores;
@@ -720,7 +725,7 @@ int main() {
 		VkSemaphore signal_semaphores[] = { render_finished_semaphore };
 		submit_info1.signalSemaphoreCount = 1;
 		submit_info1.pSignalSemaphores = signal_semaphores;
-		graphicsBase::Base().SubmitCommandBuffer_Graphics(submit_info1);
+		graphicsBase::Base().SubmitCommandBuffer_Graphics(submit_info1,fence);
 		//present
 		VkPresentInfoKHR present_info = {};
 		present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -733,7 +738,7 @@ int main() {
 		present_info.pImageIndices = &imageIndex;
 		present_info.pResults = nullptr;
 		graphicsBase::Base().PresentImage(present_info);
-
+		fence.WaitAndReset();
 	}
 
 	TerminateWindow();
