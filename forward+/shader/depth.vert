@@ -6,7 +6,7 @@ layout(std140, set = 0, binding = 0) uniform SceneObjectUbo
     mat4 model;
 } transform;
 
-layout(std140, set = 1, binding = 0) buffer readonly CameraUbo // FIXME: change back to uniform
+layout(std140, set = 1, binding = 0) uniform CameraUbo 
 {
     mat4 view;
     mat4 proj;
@@ -15,9 +15,9 @@ layout(std140, set = 1, binding = 0) buffer readonly CameraUbo // FIXME: change 
 } camera;
 
 layout(location = 0) in vec3 in_position;
-// layout(location = 1) in vec3 in_color;
-// layout(location = 2) in vec2 in_tex_coord;
-// layout(location = 3) in vec3 in_normal;
+layout(location = 1) in vec3 in_color;
+layout(location = 2) in vec2 in_tex_coord;
+layout(location = 3) in vec3 in_normal;
 
 out gl_PerVertex
 {

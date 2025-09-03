@@ -4,6 +4,79 @@
 #include"scene.hpp"
 
 
+//fuzhu
+void printMat4(const std::string& name, const glm::mat4& mat)
+{
+	std::cout << "---------- " << name << " ----------" << std::endl;
+	for (int i = 0; i < 4; ++i)
+	{
+		for (int j = 0; j < 4; ++j)
+		{
+			// 格式化输出：固定小数位、左对齐、占12个字符宽度
+			std::cout << std::fixed << std::setprecision(6)
+				<< std::left << std::setw(12) << mat[i][j];
+		}
+		std::cout << std::endl;
+	}
+	std::cout << std::endl;
+}
+
+// 打印glm::vec3向量的辅助函数
+void printVec3(const std::string& name, const glm::vec3& vec)
+{
+	std::cout << name << ": "
+		<< "(" << std::fixed << std::setprecision(6)
+		<< std::setw(10) << vec.x << ", "
+		<< std::setw(10) << vec.y << ", "
+		<< std::setw(10) << vec.z << ")" << std::endl;
+}
+
+// 打印CameraUbo所有数据的函数
+void printCameraUbo(const CameraUbo& ubo)
+{
+	std::cout << "===== CameraUbo Data =====" << std::endl;
+
+	// 打印各个矩阵
+	printMat4("View Matrix", ubo.view);
+	printMat4("Projection Matrix", ubo.proj);
+	printMat4("ProjView Matrix", ubo.projview);
+
+	// 打印相机位置向量
+	printVec3("Camera Position", ubo.cam_pos);
+
+	std::cout << "==========================" << std::endl << std::endl;
+}
+
+// 打印PointLight结构体的函数
+void printPointLight(const PointLight& light, const std::string& label = "")
+{
+	// 如果提供了标签，打印标签（方便区分多个光源）
+	if (!label.empty())
+	{
+		std::cout << "===== Point Light: " << label << " =====" << std::endl;
+	}
+	else
+	{
+		std::cout << "===== Point Light Data =====" << std::endl;
+	}
+
+	// 打印各成员变量
+	printVec3("  Position", light.pos);                     // 位置
+	std::cout << "  Radius:   " << std::fixed << std::setprecision(3)
+		<< std::setw(8) << light.radius << std::endl;  // 影响半径
+	printVec3("  Intensity", light.intensity);               // 强度（RGB）
+	std::cout << "  Padding:  " << std::fixed << std::setprecision(3)
+		<< std::setw(8) << light.padding << " (对齐用)" << std::endl;  // 对齐值
+
+	std::cout << "=============================" << std::endl << std::endl;
+}
+
+
+//
+
+
+
+
 inline bool isNearlyEqual(float a, float b, float tolerance = SMALL_NUMBER)
 {
 	return glm::abs(a - b) <= SMALL_NUMBER;
@@ -241,20 +314,17 @@ void CreateGraphicLayout() {
 void CreateGraphicPipeline() {
 	//Depth
 	static shaderModule vert_depth("shader/depth_vert.spv");
+	static shaderModule frag_depth("shader/depth_frag.spv");
 	//mainrender
 	static shaderModule vert_mainrender("shader/forwardplus_vert.spv");
 	static shaderModule frag_mainrender("shader/forwardplus_frag.spv");
-	static VkPipelineShaderStageCreateInfo shaderStageCreateInfos_depth[1] = {
-		vert_depth.StageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT)
+	static VkPipelineShaderStageCreateInfo shaderStageCreateInfos_depth[2] = {
+		vert_depth.StageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT),
+		frag_depth.StageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT)
 	};
 	static VkPipelineShaderStageCreateInfo shaderStageCreateInfos_mainrender[2] = {
 		vert_mainrender.StageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT),
 		frag_mainrender.StageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT)
-	};
-	
-
-	static VkPipelineShaderStageCreateInfo shaderStageCreateInfos_screen[1] = {
-		vert_depth.StageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT),
 	};
 	auto Create = [] {
 		//Depth
@@ -274,10 +344,11 @@ void CreateGraphicPipeline() {
 		pipelineCiPack0.rasterizationStateCi.lineWidth = 1;
 		pipelineCiPack0.rasterizationStateCi.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		pipelineCiPack0.multisampleStateCi.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		pipelineCiPack0.depthStencilStateCi.depthTestEnable = VK_TRUE;
 		pipelineCiPack0.depthStencilStateCi.depthCompareOp = VK_COMPARE_OP_LESS;
 		pipelineCiPack0.depthStencilStateCi.depthWriteEnable = VK_TRUE;
 		pipelineCiPack0.UpdateAllArrays();
-		pipelineCiPack0.createInfo.stageCount = 1;
+		pipelineCiPack0.createInfo.stageCount = 2;
 		pipelineCiPack0.createInfo.pStages = shaderStageCreateInfos_depth;
 		pipeline_depth.Create(pipelineCiPack0);
 		
@@ -377,7 +448,7 @@ void Updateuniform(float deltatime) {
 	ubo.projview = ubo.proj * ubo.view;
 	ubo.cam_pos = graphicsBase::Base().cam_pos;
 	Buffers1().camera_uniform_buffer.TransferData(ubo);
-
+	
 	auto light_num = static_cast<int>(pointlights.size());
 	VkDeviceSize bufferSize = sizeof(PointLight) * MAX_POINT_LIGHT_COUNT + sizeof(glm::vec4);
 	for (int i = 0; i < light_num; i++) {
@@ -415,7 +486,7 @@ void createDepthPrePassCommandBuffer() {
 		VkBuffer vertex_buffers[] = { part.vertex_buffer_section.buffer };
 		VkDeviceSize vertex_offsets[] = { part.vertex_buffer_section.offset };
 		vkCmdBindVertexBuffers(depth_prepass_command_buffer, 0, 1, vertex_buffers, vertex_offsets);
-		vkCmdBindIndexBuffer(depth_prepass_command_buffer, part.vertex_buffer_section.buffer, part.vertex_buffer_section.offset, VK_INDEX_TYPE_UINT16);
+		vkCmdBindIndexBuffer(depth_prepass_command_buffer, part.index_buffer_section.buffer, part.index_buffer_section.offset, VK_INDEX_TYPE_UINT32);
 		vkCmdDrawIndexed(depth_prepass_command_buffer, static_cast<uint32_t>(part.index_count), 1,0, 0, 0);
 	}
 	RenderPassAndFramebuffers_Depth().renderPass.CmdEnd(depth_prepass_command_buffer);
@@ -563,14 +634,15 @@ void createGraphicsCommandBuffer() {
 
 void prepareAll() {
 	CreateDescriptorSetLayout();
+	CreateGraphicLayout();
+	CreateGraphicPipeline();
+	CreateComputePipeline();
+	model.loadModelFromFile(getGlobalTestSceneConfiguration().model_file, Sampler(), DescriptorPool(), material_descriptor_set_layout);
 	CreateSceneObjectDescriptorSet();
 	CreateCameraDescriptorSet();
 	createLigutCullingDescriptorSet();
 	CreateIntermediateDescriptorSet();
 	updateIntermediateDescriptorSet();
-	CreateGraphicLayout();
-	CreateGraphicPipeline();
-	CreateComputePipeline();
 	createDepthPrePassCommandBuffer();
 	createlightcullincommand_bufferCommandBuffer();
 	createGraphicsCommandBuffer();
@@ -652,10 +724,11 @@ int main() {
 	
 	if (!InitializeWindow({ 1280, 720 }))
 		return -1;
-	
+	Buffers1().camera_uniform_buffer;
 	
 	std::vector<semfence>semfences(graphicsBase::Base().SwapchainImageCount());
-
+	graphicsBase::Base().cam_pos = camera.getpos();
+	graphicsBase::Base().view_matrix = camera.getViewMatrix();
 	predepthAttachment.Create(
 		VK_FORMAT_D32_SFLOAT,             
 		windowSize,                           
@@ -663,14 +736,21 @@ int main() {
 		VK_SAMPLE_COUNT_1_BIT,                     
 		VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT  
 	);
+	
+	
 	prepareAll();
-	model.loadModelFromFile(getGlobalTestSceneConfiguration().model_file, Sampler(), DescriptorPool(), material_descriptor_set_layout);
+	camera.position = getGlobalTestSceneConfiguration().camera_position;
+	camera.rotation = getGlobalTestSceneConfiguration().camera_rotation;
+	graphicsBase::Base().cam_pos = camera.getpos();
+	graphicsBase::Base().view_matrix = camera.getViewMatrix();
 	auto start_time = std::chrono::high_resolution_clock::now();
 	auto previous = std::chrono::high_resolution_clock::now();
 	decltype(previous) current;
 	float delta_time;
 	uint32_t frameObjectIndex = 0;
 	
+
+
 	while (!glfwWindowShouldClose(pWindow)) {
 		while (glfwGetWindowAttrib(pWindow, GLFW_ICONIFIED))
 		{
@@ -691,8 +771,12 @@ int main() {
 			tick(delta_time);
 			previous = current;
 		}
-
+		graphicsBase::Base().cam_pos = camera.getpos();
+		graphicsBase::Base().view_matrix = camera.getViewMatrix();
 		Updateuniform(delta_time);
+
+
+
 		semaphore semaphore_imageIsAvailable;
 		frameObjectIndex = (frameObjectIndex + 1) % graphicsBase::Base().SwapchainImageCount();
 		graphicsBase::Base().SwapImage(semaphore_imageIsAvailable);
